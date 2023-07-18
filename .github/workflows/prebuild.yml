@@ -1,0 +1,56 @@
+name: Prebuild
+
+on:
+  push:
+    branches:
+      - main
+      - prebuilt
+    tags:
+      - '*'
+
+jobs:
+  build:
+    permissions:
+      contents: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version:
+          - 10.x
+          - 12.x
+          - 14.x
+          - 16.x
+        os:
+          # - macos-latest
+          - ubuntu-latest
+          - windows-latest
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v2
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Install BuildTools (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        choco install python python2 -y
+        choco install visualstudio2019buildtools -y
+        choco install visualstudio2019-workload-vctools -y
+
+    - name: Install BuildTools (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: sudo apt-get install -y make python3 python2 build-essential
+
+    - run: npm i
+
+    - name: Build binaries
+      run: npx prebuild --strip
+
+    - name: Upload prebuilds
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: npx prebuild --strip -u ${{ secrets.GITHUB_TOKEN }}
